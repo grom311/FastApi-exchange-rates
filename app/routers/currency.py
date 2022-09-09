@@ -75,11 +75,15 @@ async def get_exchange_rates_code(
 
     if exch_rates_code == -1:
         logger.info(f"Response rates Cur_OfficialRate: {currency_code} not exist.")
-        return {'response': f"Response rates Cur_OfficialRate: {currency_code} not exist."}
-    response.headers["CRC32"] = await decode_to_crc32(exch_rates_code)
-    logger.info(f"Response rates Cur_OfficialRate: {exch_rates_code}")
+        ret = {'response': f"Response rates Cur_OfficialRate: {currency_code} not exist."}
+        response.headers["CRC32"] = await decode_to_crc32(ret)
+        return ret
     ch_course = await course_change_day(exch_rates_code, currency_code, ondate, redis)
-    return {'Cur_OfficialRate': exch_rates_code, 'ch_course': ch_course}
+    ret = {'Cur_OfficialRate': exch_rates_code, 'ch_course': ch_course}
+    response.headers["CRC32"] = await decode_to_crc32(ret)
+    logger.info(f"Response rates Cur_OfficialRate: {ret}")
+
+    return ret
 
 
 async def course_change_day(exch_rates_code, currency_code, ondate, redis):
