@@ -8,7 +8,6 @@ from aioredis import Redis
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
     Query,
     Request,
     Response
@@ -24,6 +23,7 @@ router = APIRouter(
 )
 
 async def redis_connect():
+    """Method returns generator Redis connections."""
     redis = await Redis.from_url(
         f"redis://{REDIS_HOST}:{REDIS_PORT}",
         max_connections=10,
@@ -39,7 +39,10 @@ async def get_exchange_rates(
         request: Request,
         redis: Redis = Depends(redis_connect),
         ondate: date=date.today()):
-    """"""
+    """
+        Endpoint get info from NBRB by exchange rates on date.
+        The information is stored in Redis, if it exists, return message about it..
+    """
     logger.info(f"Request rates: {request.url}")
     key = str(ondate)
     get_cashe = await redis.get(key)
@@ -63,7 +66,10 @@ async def get_exchange_rates_code(
         currency_code:int = Query(...),
         redis: Redis = Depends(redis_connect),
         ondate: date = date.today()):
-    """"""
+    """
+        Endpoint get info from NBRB by exchange rates on date and code currency.
+        The information is stored in Redis, if it exists, return it from Redis.
+    """
     logger.info(f"Request rates Cur_OfficialRate: {request.url}")
     key = str(ondate)
     get_cashe = await redis.get(key)
@@ -83,11 +89,13 @@ async def get_exchange_rates_code(
 
 
 async def decode_to_crc32(param):
+    """Decode to the crc32 from any str."""
     byte_val = str(param).encode()
     return str(zlib.crc32(byte_val))
 
 
 async def response_body(ondate):
+    """Method returns info about currency rates from nbrb api."""
     api_url = f"https://www.nbrb.by/api/exrates/rates?periodicity=0"
     params = {'ondate': ondate}
     async with httpx.AsyncClient() as client:
@@ -95,6 +103,7 @@ async def response_body(ondate):
     return response
 
 async def get_cur_official_rate(get_cashe, currency_code):
+    """Find the exchange rate from the cache by the given code."""
     json_cashe:list = json.loads(get_cashe)
     exch_rates_code = -1
     for i in json_cashe:
@@ -102,7 +111,3 @@ async def get_cur_official_rate(get_cashe, currency_code):
             exch_rates_code = i.get('Cur_OfficialRate')
             break
     return exch_rates_code
-
-def http_exception():
-    """Return Exception with description."""
-    return HTTPException(status_code=404, detail="Cur_ID not exist.")
