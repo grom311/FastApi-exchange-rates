@@ -1,7 +1,6 @@
 import json
 import zlib
-from datetime import date
-from pprint import pprint
+from datetime import date, timedelta
 
 import httpx
 from aioredis import Redis
@@ -71,21 +70,37 @@ async def get_exchange_rates_code(
         The information is stored in Redis, if it exists, return it from Redis.
     """
     logger.info(f"Request rates Cur_OfficialRate: {request.url}")
-    key = str(ondate)
-    get_cashe = await redis.get(key)
-    if get_cashe is None:
-        response = await response_body(ondate)
-
-        await redis.set(key, json.dumps(response.json()))
-        get_cashe = await redis.get(key)
-
+    get_cashe = await redis_cashe(ondate, redis)
     exch_rates_code = await get_cur_official_rate(get_cashe, currency_code)
+
     if exch_rates_code == -1:
         logger.info(f"Response rates Cur_OfficialRate: {currency_code} not exist.")
         return {'response': f"Response rates Cur_OfficialRate: {currency_code} not exist."}
     response.headers["CRC32"] = await decode_to_crc32(exch_rates_code)
     logger.info(f"Response rates Cur_OfficialRate: {exch_rates_code}")
-    return {'Cur_OfficialRate': exch_rates_code}
+    ch_course = await course_change_day(exch_rates_code, currency_code, ondate, redis)
+    return {'Cur_OfficialRate': exch_rates_code, 'ch_course': ch_course}
+
+
+async def course_change_day(exch_rates_code, currency_code, ondate, redis):
+    """Method returns delta course change by 1 day."""
+    yestaday = ondate - timedelta(days=1)
+    get_cashe = await redis_cashe(yestaday, redis)
+    yestaday_exch_rates_code = await get_cur_official_rate(get_cashe, currency_code)
+
+    return round(exch_rates_code-yestaday_exch_rates_code, 4)
+
+
+async def redis_cashe(ondate, redis):
+    """Methos returns cashe from Redis, if not exist, set in Redis."""
+    key = str(ondate)
+    get_cashe = await redis.get(key)
+
+    if get_cashe is None:
+        response = await response_body(ondate)
+        await redis.set(key, json.dumps(response.json()))
+        get_cashe = await redis.get(key)
+    return get_cashe
 
 
 async def decode_to_crc32(param):
@@ -96,7 +111,7 @@ async def decode_to_crc32(param):
 
 async def response_body(ondate):
     """Method returns info about currency rates from nbrb api."""
-    api_url = f"https://www.nbrb.by/api/exrates/rates?periodicity=0"
+    api_url = "https://www.nbrb.by/api/exrates/rates?periodicity=0"
     params = {'ondate': ondate}
     async with httpx.AsyncClient() as client:
         response = await client.get(api_url, params=params)
