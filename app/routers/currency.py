@@ -17,7 +17,7 @@ from .logger import logger
 
 router = APIRouter(
     prefix="/currency",
-    tags=["currency from nbrb"],
+    tags=["Сurrency from nbrb"],
     responses={404: {"description": "Not Found"}}
 )
 
