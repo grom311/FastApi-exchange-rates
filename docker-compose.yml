@@ -6,7 +6,24 @@ services:
       - "6379:6379"
     volumes:
         - redis_data:/data
-
+  rabbitmq:
+      image: rabbitmq:3-management-alpine
+      hostname: rabbitmq
+      container_name: 'rabbitmq'
+      environment:
+          RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-admin}
+          RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-admin}
+      ports:
+          - 5672:5672
+          - 15672:15672
+      # volumes:
+      #     - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+      #     - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+      healthcheck:
+          test: [ "CMD", "rabbitmqctl", "status"]
+          interval: 5s
+          timeout: 20s
+          retries: 5
   app:
     build: 
       context: ./app
@@ -14,6 +31,9 @@ services:
     environment:
       REDIS_HOST: 'redis'
       REDIS_PORT: '6379'
+      RABBITMQ_USERNAME: admin
+      RABBITMQ_PASSWORD: admin
+      RABBITMQ_HOST: rabbitmq
     depends_on:
       - redis
     command: uvicorn main:app --reload --workers 1 --host 0.0.0.0 --port 8000

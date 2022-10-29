@@ -12,6 +12,8 @@ from fastapi import (
     Response
 )
 
+from .sender import send_message
+from ..receive import receive_mess
 from settings import REDIS_HOST, REDIS_PORT
 from .logger import logger
 
@@ -46,8 +48,8 @@ async def get_exchange_rates(
     key = str(ondate)
     get_cashe = await redis.get(key)
     if get_cashe is None:
-        response = await response_body(ondate)
-        await redis.set(key, json.dumps(response.json()))
+        resp_body = await response_body(ondate)
+        await redis.set(key, json.dumps(resp_body.json()))
         ret_str:str = f"Exchange rates on date {ondate} successful save."
         response.headers["CRC32"] = await decode_to_crc32(ret_str)
         logger.info(f"Response rates: {ret_str}")
@@ -84,6 +86,33 @@ async def get_exchange_rates_code(
     logger.info(f"Response rates Cur_OfficialRate: {ret}")
 
     return ret
+
+
+@router.get('/send_message')
+async def send_some_mess(redis: Redis = Depends(redis_connect)):
+    # redis.flushdb()
+    restaurant_484272 = {
+        "name": "Ravagh",
+        "type": "Persian",
+        "address": {
+            "street": {
+                "line1": "11 E 30th St",
+                "line2": "APT 1",
+            },
+            "city": "New York",
+            "state": "NY",
+            "zip": 10016,
+        }
+    }
+    send_message(body=json.dumps(restaurant_484272))
+    return await redis.keys('*')
+
+
+@router.get('/receive')
+async def get_mess():
+    print('start')
+    receive_mess()
+    print('end')
 
 
 async def course_change_day(exch_rates_code, currency_code, ondate, redis):
